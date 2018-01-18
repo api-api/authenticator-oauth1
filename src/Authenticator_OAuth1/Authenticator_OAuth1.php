@@ -13,6 +13,7 @@ use APIAPI\Core\Transporters\Transporter;
 use APIAPI\Core\Request\Request;
 use APIAPI\Core\Request\Response;
 use APIAPI\Core\Request\Route_Request;
+use APIAPI\Core\Request\Method;
 use APIAPI\Core\Exception\Request_Authentication_Exception;
 
 if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
@@ -74,7 +75,7 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 
 			if ( empty( $token ) || empty( $token_secret ) ) {
 				if ( empty( $temporary_token ) || empty( $temporary_token_secret ) ) {
-					list( $temporary_token, $temporary_token_secret ) = $this->get_temporary_credentials( $data['request'], $consumer_key, $consumer_secret, $data['callback'], 'POST' );
+					list( $temporary_token, $temporary_token_secret ) = $this->get_temporary_credentials( $data['request'], $consumer_key, $consumer_secret, $data['callback'], Method::POST );
 
 					call_user_func( $data['apply_temporary_token_callback'], $consumer_key, $consumer_secret, $temporary_token, $temporary_token_secret );
 				}
@@ -83,7 +84,7 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 					$this->authorize_user( $data['authorize'], $temporary_token, $data['authorize_redirect_callback'] );
 				}
 
-				list( $token, $token_secret ) = $this->get_token_credentials( $data['access'], $consumer_key, $consumer_secret, $temporary_token, $temporary_token_secret, $temporary_token_verifier, 'POST' );
+				list( $token, $token_secret ) = $this->get_token_credentials( $data['access'], $consumer_key, $consumer_secret, $temporary_token, $temporary_token_secret, $temporary_token_verifier, Method::POST );
 
 				call_user_func( $data['apply_token_callback'], $consumer_key, $consumer_secret, $token, $token_secret );
 			}
@@ -142,7 +143,7 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 *
 		 * @throws Request_Authentication_Exception Thrown when the credentials response is invalid.
 		 */
-		protected function get_temporary_credentials( $request_url, $consumer_key, $consumer_secret, $callback_url, $method = 'POST' ) {
+		protected function get_temporary_credentials( $request_url, $consumer_key, $consumer_secret, $callback_url, $method = Method::POST ) {
 			$protocol_params = $this->get_protocol_params( $consumer_key, array( 'oauth_callback' => $callback_url ) );
 
 			$protocol_params['oauth_signature'] = $this->sign_params( $request_url, $protocol_params, $consumer_secret, '', $method );
@@ -196,7 +197,7 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 *
 		 * @throws Request_Authentication_Exception Thrown when the credentials response is invalid.
 		 */
-		protected function get_token_credentials( $access_url, $consumer_key, $consumer_secret, $temporary_token, $temporary_token_secret, $temporary_token_verifier, $method = 'POST' ) {
+		protected function get_token_credentials( $access_url, $consumer_key, $consumer_secret, $temporary_token, $temporary_token_secret, $temporary_token_verifier, $method = Method::POST ) {
 			$request_params = array(
 				'oauth_verifier' => $temporary_token_verifier,
 			);
@@ -232,7 +233,7 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * @param array  $additional_params Additional protocol parameters to merge.
 		 * @return array Array of protocol parameters.
 		 */
-		protected function get_protocol_params( $consumer_key, $additional_params = array() ) {
+		protected function get_protocol_params( $consumer_key, array $additional_params = array() ) {
 			return array_merge( array(
 				'oauth_consumer_key'     => $consumer_key,
 				'oauth_nonce'            => $this->create_nonce(),
@@ -268,7 +269,7 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * @param string $method          Optional. Request method. Default 'POST'.
 		 * @return string Signing string to append to the parameters.
 		 */
-		protected function sign_params( $url, $params, $consumer_secret, $token_secret = '', $method = 'POST' ) {
+		protected function sign_params( $url, array $params, $consumer_secret, $token_secret = '', $method = Method::POST ) {
 			$base_string = rawurlencode( $method ) . '&';
 
 			$parts = parse_url( $url );
@@ -310,7 +311,7 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * @param array $protocol_params Array of protocol parameters.
 		 * @return string Normalized header string.
 		 */
-		protected function normalize_protocol_params( $protocol_params ) {
+		protected function normalize_protocol_params( array $protocol_params ) {
 			array_walk( $protocol_params, function( &$value, $key ) {
 				$value = rawurlencode( $key ) . '="' . rawurlencode( $value ) . '"';
 			});
