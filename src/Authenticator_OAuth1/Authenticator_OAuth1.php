@@ -2,16 +2,18 @@
 /**
  * Authenticator_OAuth1 class
  *
- * @package APIAPIAuthenticatorOAuth1
+ * @package APIAPI\Authenticator_OAuth1
  * @since 1.0.0
  */
 
 namespace APIAPI\Authenticator_OAuth1;
 
 use APIAPI\Core\Authenticators\Authenticator;
+use APIAPI\Core\Transporters\Transporter;
 use APIAPI\Core\Request\Request;
 use APIAPI\Core\Request\Response;
-use APIAPI\Core\Exception;
+use APIAPI\Core\Request\Route_Request;
+use APIAPI\Core\Exception\Request_Authentication_Exception;
 
 if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 
@@ -28,37 +30,38 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * the required values on the request object.
 		 *
 		 * @since 1.0.0
-		 * @access public
 		 *
-		 * @param APIAPI\Core\Request\Route_Request $request The request to send.
+		 * @param Route_Request $request The request to send.
+		 *
+		 * @throws Request_Authentication_Exception Thrown when the request cannot be authenticated.
 		 */
-		public function authenticate_request( $request ) {
+		public function authenticate_request( Route_Request $request ) {
 			$data = $this->parse_authentication_data( $request );
 
 			foreach ( array( 'request', 'authorize', 'access', 'callback' ) as $url ) {
 				if ( empty( $url ) ) {
-					throw new Exception( sprintf( 'The request to %s could not be authenticated as one of the required URLs has not been provided.', $request->get_uri() ) );
+					throw new Request_Authentication_Exception( sprintf( 'The request to %s could not be authenticated as one of the required URLs has not been provided.', $request->get_uri() ) );
 				}
 			}
 
 			if ( empty( $data['consumer_key'] ) ) {
-				throw new Exception( sprintf( 'The request to %s could not be authenticated as no consumer key has been provided.', $request->get_uri() ) );
+				throw new Request_Authentication_Exception( sprintf( 'The request to %s could not be authenticated as no consumer key has been provided.', $request->get_uri() ) );
 			}
 
 			if ( empty( $data['consumer_secret'] ) ) {
-				throw new Exception( sprintf( 'The request to %s could not be authenticated as no consumer secret has been provided.', $request->get_uri() ) );
+				throw new Request_Authentication_Exception( sprintf( 'The request to %s could not be authenticated as no consumer secret has been provided.', $request->get_uri() ) );
 			}
 
 			if ( empty( $data['apply_token_callback'] ) ) {
-				throw new Exception( sprintf( 'The request to %s could not be authenticated as no callback function for applying the token has been provided.', $request->get_uri() ) );
+				throw new Request_Authentication_Exception( sprintf( 'The request to %s could not be authenticated as no callback function for applying the token has been provided.', $request->get_uri() ) );
 			}
 
 			if ( empty( $data['apply_temporary_token_callback'] ) ) {
-				throw new Exception( sprintf( 'The request to %s could not be authenticated as no callback function for applying the temporary token has been provided.', $request->get_uri() ) );
+				throw new Request_Authentication_Exception( sprintf( 'The request to %s could not be authenticated as no callback function for applying the temporary token has been provided.', $request->get_uri() ) );
 			}
 
 			if ( empty( $data['authorize_redirect_callback'] ) ) {
-				throw new Exception( sprintf( 'The request to %s could not be authenticated as no callback function for redirecting to the authorize URL has been provided.', $request->get_uri() ) );
+				throw new Request_Authentication_Exception( sprintf( 'The request to %s could not be authenticated as no callback function for redirecting to the authorize URL has been provided.', $request->get_uri() ) );
 			}
 
 			$consumer_key             = $data['consumer_key'];
@@ -109,12 +112,11 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * It only checks whether authentication data has been properly set on it.
 		 *
 		 * @since 1.0.0
-		 * @access public
 		 *
-		 * @param APIAPI\Core\Request\Route_Request $request The request to check.
+		 * @param Route_Request $request The request to check.
 		 * @return bool True if the request is authenticated, otherwise false.
 		 */
-		public function is_authenticated( $request ) {
+		public function is_authenticated( Route_Request $request ) {
 			$data = $this->parse_authentication_data( $request );
 
 			$header_value = $request->get_header( 'Authorization' );
@@ -129,7 +131,6 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * Retrieves temporary credentials to use for authorization.
 		 *
 		 * @since 1.0.0
-		 * @access protected
 		 *
 		 * @param string $request_url     The API's request URL that provides temporary credentials.
 		 * @param string $consumer_key    The consumer key for the API.
@@ -138,6 +139,8 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * @param string $method          Optional. HTTP request method. Default 'POST'.
 		 * @return array Array with the temporary token as first and temporary token secret as second
 		 *               element.
+		 *
+		 * @throws Request_Authentication_Exception Thrown when the credentials response is invalid.
 		 */
 		protected function get_temporary_credentials( $request_url, $consumer_key, $consumer_secret, $callback_url, $method = 'POST' ) {
 			$protocol_params = $this->get_protocol_params( $consumer_key, array( 'oauth_callback' => $callback_url ) );
@@ -152,7 +155,7 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 			$response = new Response( $transporter->send_request( $request ) );
 
 			if ( 'true' !== $response->get_param( 'oauth_callback_confirmed' ) ) {
-				throw new Exception( sprintf( 'The request to %s returned an invalid response.', $request_url ) );
+				throw new Request_Authentication_Exception( sprintf( 'The request to %s returned an invalid response.', $request_url ) );
 			}
 
 			return array( $response->get_param( 'oauth_token' ), $response->get_param( 'oauth_token_secret' ) );
@@ -162,7 +165,6 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * Authorizes the user.
 		 *
 		 * @since 1.0.0
-		 * @access protected
 		 *
 		 * @param string   $authorize_url               The API's authorize URL that asks the user to grant
 		 *                                              access to the service.
@@ -182,7 +184,6 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * Retrieves token credentials to use for authentication.
 		 *
 		 * @since 1.0.0
-		 * @access protected
 		 *
 		 * @param string $access_url               The API's access URL that provides token credentials.
 		 * @param string $consumer_key             The consumer key for the API.
@@ -192,6 +193,8 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * @param string $temporary_token_verifier The temporary token verifier.
 		 * @param string $method                   Optional. HTTP request method. Default 'POST'.
 		 * @return array Array with the token as first and token secret as second element.
+		 *
+		 * @throws Request_Authentication_Exception Thrown when the credentials response is invalid.
 		 */
 		protected function get_token_credentials( $access_url, $consumer_key, $consumer_secret, $temporary_token, $temporary_token_secret, $temporary_token_verifier, $method = 'POST' ) {
 			$request_params = array(
@@ -210,11 +213,11 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 			$response = new Response( $transporter->send_request( $request ) );
 
 			if ( null === $response->get_param( 'oauth_token' ) ) {
-				throw new Exception( sprintf( 'The request to %s returned an invalid response.', $access_url ) );
+				throw new Request_Authentication_Exception( sprintf( 'The request to %s returned an invalid response.', $access_url ) );
 			}
 
 			if ( null !== ( $error = $response->get_param( 'error' ) ) ) {
-				throw new Exception( sprintf( 'The request to %1$s returned an error: %2$s', $access_url, $error ) );
+				throw new Request_Authentication_Exception( sprintf( 'The request to %1$s returned an error: %2$s', $access_url, $error ) );
 			}
 
 			return array( $response->get_param( 'oauth_token' ), $response->get_param( 'oauth_token_secret' ) );
@@ -224,7 +227,6 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * Returns protocol parameters.
 		 *
 		 * @since 1.0.0
-		 * @access protected
 		 *
 		 * @param string $consumer_key      The consumer key for the API.
 		 * @param array  $additional_params Additional protocol parameters to merge.
@@ -244,7 +246,6 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * Creates a random string.
 		 *
 		 * @since 1.0.0
-		 * @access protected
 		 *
 		 * @param int $length Optional. Length of the random string. Default 32.
 		 * @return string Nonce string.
@@ -259,7 +260,6 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * Signs parameters for a request.
 		 *
 		 * @since 1.0.0
-		 * @access protected
 		 *
 		 * @param string $url             URL the request should be sent to.
 		 * @param array  $params          Authorization parameters.
@@ -306,7 +306,6 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * Normalizes protocol parameters into an Authorization header string.
 		 *
 		 * @since 1.0.0
-		 * @access protected
 		 *
 		 * @param array $protocol_params Array of protocol parameters.
 		 * @return string Normalized header string.
@@ -323,9 +322,8 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * Gets the default transporter object.
 		 *
 		 * @since 1.0.0
-		 * @access protected
 		 *
-		 * @return APIAPI\Core\Transporters\Transporter Default transporter object.
+		 * @return Transporter Default transporter object.
 		 */
 		protected function get_default_transporter() {
 			//TODO: This breaks the dependency injection pattern.
@@ -336,7 +334,6 @@ if ( ! class_exists( 'APIAPI\Authenticator_OAuth1\Authenticator_OAuth1' ) ) {
 		 * Sets the default authentication arguments.
 		 *
 		 * @since 1.0.0
-		 * @access protected
 		 */
 		protected function set_default_args() {
 			$this->default_args = array(
